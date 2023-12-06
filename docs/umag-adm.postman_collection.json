@@ -1,0 +1,221 @@
+{
+	"info": {
+		"_postman_id": "750f0ebe-8d3b-45c0-bae2-5b207485b620",
+		"name": "umag-adm",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "7367398"
+	},
+	"item": [
+		{
+			"name": "Test",
+			"item": [
+				{
+					"name": "Get application info",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rest/adm/test",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rest",
+								"adm",
+								"test"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "noauth"
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.environment.set(\"paybox_signature\", makeSignature());",
+					"pm.request.headers.add({key: '__auth-user-id', value: pm.environment.get('auth-user-id')});",
+					"pm.request.headers.add({key: '__auth-store-id', value: pm.environment.get('auth-store-id')});",
+					"pm.request.headers.add({key: '__auth-store-group-id', value: pm.environment.get('auth-store-group-id')});",
+					"pm.request.headers.add({key: '__auth-company-id', value: pm.environment.get('auth-company-id')});",
+					"pm.request.headers.add({key: '__auth-permissions', value: pm.environment.get('auth-permissions')});",
+					"",
+					"/**",
+					" * Возвращает сгенерированную подпись",
+					" */",
+					"function makeSignature() {",
+					"  var methodName    = getMethodName();",
+					"  if (methodName != 'callback') {",
+					"      return;",
+					"  }",
+					"",
+					"  var requestFields = getFields();",
+					"  var secretKey     = getSecretKey(methodName);",
+					"  var signature     = [methodName];",
+					"",
+					"  // Сортировка по алфавиту",
+					"  Object.keys(requestFields).sort().forEach(function(key) {",
+					"    if (key != 'pg_sig') {",
+					"      signature.push(getValue(requestFields[key]));",
+					"    }",
+					"  });",
+					"",
+					"  string    = signature.join(';') + ';' + secretKey;",
+					"  signature = CryptoJS.MD5(string).toString();",
+					"",
+					"  console.log('Make sign from', string);",
+					"",
+					"  return signature;",
+					"}",
+					"",
+					"/**",
+					" * Возвращает имя метода",
+					" */",
+					"function getMethodName() {",
+					"  return request.url.split('?').shift().split('/').pop();",
+					"}",
+					"",
+					"/**",
+					" * Возвращает все поля запроса в ввиде объекта",
+					" */",
+					"function getFields() {",
+					"  var result         = {};",
+					"  var paramsFromUrl  = request.url.split('?')[1];",
+					"  var paramsFromBody = pm.request.body;",
+					"  ",
+					"  // Парсинг полей из адресной строки",
+					"  if (paramsFromUrl) {",
+					"    var eachParamArray = paramsFromUrl.split('&');",
+					"",
+					"    eachParamArray.forEach((param) => {",
+					"      let key   = param.split('=')[0];",
+					"      let value = param.split('=')[1];",
+					"      ",
+					"      Object.assign(result, {[key]: value});",
+					"    });",
+					"",
+					"  // Парсинг полей из тела запроса",
+					"  } else {",
+					"    paramsFromBody.toJSON().urlencoded.forEach((param) => {",
+					"      if (param.disabled === true) return;",
+					"",
+					"      let key   = param.key;",
+					"      let value = param.value;",
+					"      ",
+					"      if (key == 'pg_xml') {",
+					"        let xml = xml2Json(value);",
+					"        ",
+					"        Object.keys(xml.request).sort().forEach(function(xmlKey) {",
+					"          Object.assign(result, {[xmlKey]: xml.request[xmlKey]});",
+					"        });",
+					"      } else {",
+					"        Object.assign(result, {[key]: value});",
+					"      }",
+					"    });",
+					"  }",
+					"  ",
+					"  return result;",
+					"}",
+					"",
+					"/**",
+					" * Возвращает секретный ключ",
+					" */",
+					"function getSecretKey(methodName) {",
+					"  var secretKey       = '{{paybox_merchant_secret}}';",
+					"  var payoutSecretKey = '{{paybox_merchant_secret_payout}}';",
+					"  var payoutMethods   = ['reg2reg', 'reg2nonreg', 'payment_status', 'p2p', 'p2p_secure', 'p2p2nonreg', 'p2p2nonreg_foreign'];",
+					"",
+					"  if (payoutMethods.indexOf(methodName) + 1) {",
+					"    secretKey = payoutSecretKey;",
+					"  }",
+					"",
+					"  return getValue(secretKey);",
+					"}",
+					"",
+					"/**",
+					" * Возвращает значение переменной",
+					" * если value является названием переменной",
+					" */",
+					"function getValue(value) {",
+					"  value = value.trim();",
+					"  ",
+					"  var len = value.length;",
+					"  var paramLikeVariable = value.substring(0, 2) == '{{' && value.substring(len-2) == '}}';",
+					"  ",
+					"  if (paramLikeVariable) {",
+					"    var variableName = value.substring(2, len-2).trim();",
+					"",
+					"    if (postman.getGlobalVariable(variableName)) {",
+					"      value = postman.getGlobalVariable(variableName);",
+					"    }",
+					"",
+					"    if (postman.getEnvironmentVariable(variableName)) {",
+					"      value = postman.getEnvironmentVariable(variableName);",
+					"    }",
+					"  }",
+					"    ",
+					"  return value;",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "server",
+			"value": "http://localhost:8080"
+		},
+		{
+			"key": "appVersion",
+			"value": "0.0.1",
+			"type": "string"
+		},
+		{
+			"key": "companyId",
+			"value": "1"
+		},
+		{
+			"key": "employeeId",
+			"value": "1"
+		}
+	]
+}

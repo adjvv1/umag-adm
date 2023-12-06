@@ -1,0 +1,52 @@
+umag-adm:
+  version: ${UMAG_ADM_RELEASE_VERSION:dev}
+  job:
+    store-activity:
+      enabled: true
+
+
+
+
+server:
+#  port: ${UMAG_ADM_PORT:8080}
+  port: ${UMAG_ADM_PORT:18080}
+  servlet:
+    encoding:
+      charset: UTF-8 # Charset of HTTP requests and responses. Added to the "Content-Type" header if not set explicitly
+      enabled: true # Enables http encoding support
+      force: true
+
+spring:
+  datasource:
+    url: ${UMAG_ADM_DB_URL:jdbc:mariadb://localhost:3306/umag_adm}
+    username: ${UMAG_ADM_DB_USERNAME:root}
+    password: ${UMAG_ADM_DB_PASSWORD:123qwe123}
+    driverClassName: org.mariadb.jdbc.Driver
+  flyway:
+    enabled: false
+
+
+springdoc:
+  api-docs:
+    enabled: ${UMAG_ADM_ENABLE_DOCS:false}
+    groups:
+      enabled: true
+    # Path for JSON-docs
+    path: /docs
+    version: openapi_3_0
+  swagger-ui:
+    enabled: ${UMAG_ADM_ENABLE_DOCS:false}
+    # Path for UI-docs
+    path: /docs-ui.html
+    try-it-out-enabled: true
+
+umag:
+  api:
+    operation:
+      url: ${UMAG_ADM_API_OPERA_URL:https://e9a24f4f-a1ab-409a-87ba-b44cac0b6479.mock.pstmn.io}
+
+#logging:
+#  level:
+#    org:
+#      springframework:
+#        web: DEBUG

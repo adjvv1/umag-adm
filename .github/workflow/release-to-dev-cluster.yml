@@ -1,0 +1,78 @@
+name: Release to GCP Dev cluster
+
+# Would be triggered with every new "Release"
+on:
+  push:
+    branches: [ dev-deploy ]
+
+env:
+  RELEASE_VERSION: ${{ github.run_id }}
+  ARTIFACT_REPO_NAME: docker-registry
+  PROJECT_ID: ${{ secrets.GCP_UMAG_ADM_PROJID_DEV }}
+  CLUSTER_NAME: legacy-dev-cluster
+  CLUSTER_REGION: ${{ secrets.GCP_UMAG_ADM_CLUSTER_REGION }}
+
+jobs:
+  release-to-repo:
+    name: Release to Google Cloud Repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieving repository name
+        run: echo "REPOSITORY_NAME=$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}')" >> $GITHUB_ENV
+        shell: bash
+
+      #      - name: Retrieving release version
+      #        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'oracle'
+          java-version: 17
+
+      - name: Maven build (jar)
+        run: mvn -B package -Dmaven.test.skip --file pom.xml
+
+      # Setup gcloud CLI
+      # https://github.com/google-github-actions/setup-gcloud#authorization
+      - id: auth
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GCP_UMAG_ADM_SAKEY_DEV }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          install_components: gke-gcloud-auth-plugin
+      - name: Connect to cluster
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.CLUSTER_REGION }}
+          project_id: ${{ env.PROJECT_ID }}
+          use_auth_provider: false
+
+      # Configure Docker to use the gcloud command-line tool as a credential
+      # helper for authentication
+      - name: Configure Docker
+        run: gcloud --quiet auth configure-docker $CLUSTER_REGION-docker.pkg.dev
+
+      # Prepare the Docker image
+      - name: Prepare the Docker image
+        run: cat Dockerfile | sed "s/{{RELEASE_VERSION}}/$RELEASE_VERSION/g" > Dockerfile.ready
+
+      # Build the Docker image
+      - name: Build Docker image
+        run: docker build -f Dockerfile.ready --tag "$CLUSTER_REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REPO_NAME/$REPOSITORY_NAME:latest" --tag "$CLUSTER_REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REPO_NAME/$REPOSITORY_NAME:$RELEASE_VERSION" .
+
+      # Push the Docker image to Google Container Registry
+      - name: Publish Docker image
+        run: docker push --all-tags "$CLUSTER_REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REPO_NAME/$REPOSITORY_NAME"
+
+      # Deploy service
+      - name: Configure kubectl
+        run: gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION --project "$PROJECT_ID"
+      - name: Deploy service
+        run: cat .gcp/dev/umag-adm.yml | sed "s/{{CLUSTER_REGION}}/$CLUSTER_REGION/g" | sed "s/{{RELEASE_VERSION}}/$RELEASE_VERSION/g" | sed "s/{{PROJECT_ID}}/$PROJECT_ID/g" | kubectl apply -f -

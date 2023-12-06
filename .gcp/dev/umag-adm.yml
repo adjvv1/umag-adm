@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: umag-adm
+  name: umag-adm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: umag-adm
+  template:
+    metadata:
+      labels:
+        app: umag-adm
+    spec:
+      containers:
+        - name: umag-adm
+          image: "{{CLUSTER_REGION}}-docker.pkg.dev/{{PROJECT_ID}}/docker-registry/umag-adm:{{RELEASE_VERSION}}"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+          resources:
+            requests:
+              cpu: "1"
+              ephemeral-storage: 1Gi
+              memory: 2Gi
+          env:
+            - name: UMAG_ADM_RELEASE_VERSION
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_RELEASE_VERSION
+                  name: umag-adm-secrets
+            - name: UMAG_ADM_PORT
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_PORT
+                  name: umag-adm-secrets
+            - name: UMAG_ADM_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_DB_URL
+                  name: umag-adm-secrets
+            - name: UMAG_ADM_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_DB_USERNAME
+                  name: umag-adm-secrets
+            - name: UMAG_ADM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_DB_PASSWORD
+                  name: umag-adm-secrets
+            - name: UMAG_ADM_ENABLE_DOCS
+              valueFrom:
+                secretKeyRef:
+                  key: UMAG_ADM_ENABLE_DOCS
+                  name: umag-adm-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: umag-adm-service
+  annotations:
+    networking.gke.io/load-balancer-type: "Internal"
+  labels:
+    app: umag-adm
+spec:
+  type: LoadBalancer
+  selector:
+    app: umag-adm
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
